@@ -1,6 +1,9 @@
-# fabric-rls-role-management
+# Semantic Link — Static RLS Role Manager
 
-Automate the creation, replacement, and member assignment of static Row Level Security (RLS) roles in a Power BI Semantic Model using a Microsoft Fabric notebook.
+**Fabric Semantic Link Developer Experience Challenge 2026**  
+**Author:** eguigurene
+
+Automate the full lifecycle of static Row Level Security (RLS) roles in a Power BI Semantic Model — creation, replacement, member assignment, and cleanup of unused roles — using a single Microsoft Fabric notebook.
 
 Built on [`semantic-link-labs`](https://github.com/microsoft/semantic-link-labs) and the Tabular Object Model (TOM), this notebook replaces the need for manual role management or Dynamic RLS security tables — both of which become painful at scale.
 
@@ -16,7 +19,7 @@ On a fact table with 10M+ rows and a security table with hundreds of combination
 
 **Static RLS roles are evaluated once at connection time** — VertiPaq resolves a fixed DAX expression instantly and propagates it through relationships. The bottleneck disappears.
 
-The problem has always been: who creates 500 static roles? This notebook does.
+The problem has always been: who creates 500 static roles? And who cleans them up when the business changes? This notebook does both.
 
 ---
 
@@ -28,28 +31,29 @@ RLS table (Lakehouse)
         ▼
 Spark DataFrame (rls)
         │
-        ├─ build_dax_filters()      → DAX expression per role per table
+        ├─ build_dax_filters()       → DAX expression per role per table
         ├─ create_or_replace_roles() → push roles + filters to semantic model
-        └─ add_members_to_roles()   → assign UPN emails to each role
-                                           │
-                                           ▼
-                              Published Semantic Model
+        ├─ add_members_to_roles()    → assign UPN emails to each role
+        └─ drop_unused_roles()       → remove roles no longer in the RLS table
+                                            │
+                                            ▼
+                               Published Semantic Model
 ```
 
-1. You define a `config` — one entry per dimension to secure (e.g. `CountryCode`, `TerritoryCode`, `BrandingCode`)
-2. You define `global_filters` — filters applied to every role on their own fixed table (e.g. `Is_National = "National"` on `DT_Customer`)
-3. The notebook reads distinct values from your RLS DataFrame, generates a role per value, applies the DAX filters, and assigns members from the `Username` column
+1. You define a `config` — one entry per dimension to secure (e.g. `Country`, `Brand`, `Company`)
+2. You define `global_filters` — filters applied to every role on their own fixed table (e.g. `Is_Consolidated = "Consolidated"` on `DT_Customer`)
+3. The notebook reads distinct values from your RLS DataFrame, generates a role per value, applies the DAX filters, assigns members from the `Username` column, and optionally cleans up any roles that no longer have matching data
 
 ---
 
 ## Design principles
 
-### Filter on dimension tables (DT), not fact tables (FT)
+### Filter on dimension tables (DT\_\*), not fact tables (FT\_\*)
 
 Filtering directly on a fact table with millions of rows means the engine scans it on every query for every user. Filtering on a dimension table lets the relationship engine propagate the filter automatically — which is exactly what VertiPaq is optimized for.
 
 ```
-DT_Customer [CountryCode = "AU"]  →  propagates through relationship  →  FT_Sales
+DT_Customer [Country = "Australia"]  →  propagates through relationship  →  FT_Sales
 ```
 
 ### Static over dynamic
@@ -62,13 +66,17 @@ DT_Customer [CountryCode = "AU"]  →  propagates through relationship  →  FT_
 | Performance on 10M+ rows | Slow | Fast |
 | 500 combinations | Very slow | Fine |
 
-### Global filters are always separate
+### Global filters are always applied to every role
 
 `global_filters` are applied to their own fixed table regardless of what the role-specific filter uses. If both land on the same table, they are merged with `&&` into a single `set_rls` call — because `set_rls` replaces, not appends.
 
 ### Members are saved one at a time
 
 A single invalid UPN causes `SaveChanges()` to reject the entire batch. By opening a fresh TOM connection per member, a bad UPN never blocks a valid one. Failed members are collected and exported as a JSON report to your Lakehouse `Files` folder.
+
+### Unused roles are cleaned up safely
+
+`drop_unused_roles()` only ever removes roles whose name matches a prefix defined in `config` — roles created outside this notebook (e.g. `Admin`, `ReadOnly`) are never touched.
 
 ---
 
@@ -86,16 +94,20 @@ A single invalid UPN causes `SaveChanges()` to reject the entire batch. By openi
 
 ### `global_filters`
 
-Filters applied to **every** role, each on their own fixed table.
+Filters applied to **every** role, each on their own fixed table. Multiple filters supported.
 
 ```python
 global_filters = [
     {
         "table":  "DT_Customer",    # Table in the semantic model
-        "column": "Is_National",
-        "value":  "National"
+        "column": "Is_Consolidated",
+        "value":  "Consolidated"
     },
-    # Add as many as needed
+    # {
+    #     "table":  "DT_Product",
+    #     "column": "Is_Active",
+    #     "value":  "True"
+    # },
 ]
 ```
 
@@ -105,15 +117,20 @@ One entry per dimension. The key must match a column name in your RLS DataFrame.
 
 ```python
 config = {
-    "CountryCode": {
-        "table":  "DT_Customer",        # Dimension table — not the fact table
-        "prefix": "RLS_CountryCode",    # Roles will be named RLS_CountryCode_AU, etc.
-        "column": "CountryCode"         # Column in the semantic model table
+    "Country": {
+        "table":  "DT_Customer",     # Dimension table — not the fact table
+        "prefix": "RLS_Country",     # Roles will be named RLS_Country_AU, etc.
+        "column": "Country"          # Column in the semantic model table
     },
-    "BrandingCode": {
+    "Brand": {
         "table":  "DT_Product",
-        "prefix": "RLS_BrandingCode",
-        "column": "BrandingCode"
+        "prefix": "RLS_Brand",
+        "column": "Brand"
+    },
+    "Company": {
+        "table":  "DT_Company",
+        "prefix": "RLS_Company",
+        "column": "Company"
     },
 }
 ```
@@ -125,8 +142,9 @@ Must contain:
 | Column | Description |
 |--------|-------------|
 | `Username` | UPN email (`user@domain.com`) |
-| `CountryCode` | One column per `config` key |
-| `BrandingCode` | ... |
+| `Country` | One column per `config` key |
+| `Brand` | ... |
+| `Company` | ... |
 
 ---
 
@@ -140,7 +158,7 @@ create_or_replace_roles(
     workspace      = workspace,
     global_filters = global_filters,
     rls            = rls,
-    config_keys    = None,   # None = all; or ["CountryCode"] to run a subset
+    config_keys    = None,   # None = all; or ["Country"] to run a subset
 )
 
 # Step 2 — optional, run separately once roles are confirmed
@@ -152,27 +170,47 @@ failed = add_members_to_roles(
     username_col = "Username",
     config_keys  = None,
 )
+
+# Step 3 — optional, run when values have been removed from the RLS table
+dropped = drop_unused_roles(
+    config      = config,
+    dataset     = dataset,
+    workspace   = workspace,
+    rls         = rls,
+    config_keys = None,
+)
 ```
 
-Both functions accept a `config_keys` parameter to process only a subset of the config — useful when iterating or debugging a specific dimension.
+All three functions accept a `config_keys` parameter to process only a subset of the config — useful when iterating or debugging a specific dimension.
+
+---
+
+## Function reference
+
+| Function | Purpose | Safe to re-run |
+|----------|---------|----------------|
+| `build_dax_filters()` | Builds DAX filter expressions per role | — |
+| `create_or_replace_roles()` | Creates or replaces roles + DAX filters in the model | ✅ Yes |
+| `add_members_to_roles()` | Assigns UPN emails to roles, one at a time | ✅ Yes |
+| `drop_unused_roles()` | Removes roles whose value no longer exists in the RLS table | ✅ Yes |
 
 ---
 
 ## Output
 
-- Roles created in the semantic model: `RLS_CountryCode_AU`, `RLS_CountryCode_MT`, ...
-- Each role has the DAX filter applied per table
+- Roles created in the semantic model: `RLS_Country_AU`, `RLS_Brand_Nike`, `RLS_Company_Acme`, ...
+- Each role has DAX filters applied per table — role-specific and global
 - Members assigned from the `Username` column in the RLS DataFrame
 - Failed members exported to `Files/rls_failed_members/` in the Lakehouse as JSON
+- Unused roles removed from the model when `drop_unused_roles()` is run
 
 ---
 
 ## File structure
 
 ```
-fabric-rls-role-management/
-├── RLS_Role_Management.ipynb   ← main notebook
-└── README.md
+2026_SemanticLink_eguigurene_StaticRLSRoleManager.ipynb   ← main notebook
+README.md
 ```
 
 ---
@@ -182,6 +220,7 @@ fabric-rls-role-management/
 - [semantic-link-labs](https://github.com/microsoft/semantic-link-labs) — the library powering the TOM connection
 - [TMDL view in Power BI Desktop](https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-tmdl-view) — the broader TMDL ecosystem this fits into
 - [Semantic model connectivity with XMLA endpoint](https://learn.microsoft.com/en-us/power-bi/enterprise/service-premium-connect-tools)
+- [Fabric Semantic Link Developer Experience Challenge](https://community.fabric.microsoft.com/t5/Power-BI-Community-Blog/Announcing-the-Fabric-Semantic-Link-Developer-Experience/ba-p/5139639)
 
 ---
 
