@@ -48,7 +48,7 @@ Same library, same functions, no code changes between them — only what the dat
 
 This runs as a scheduled pipeline: sync Active Directory → refresh RLS source data → fan out to one notebook per secured model, in parallel. Adding a model means adding one notebook, not touching the others — they share the library and write to the same audit tables without knowing about each other.
 
-![Daily production pipeline](./assets/rls_production_pipeline.png)
+![Daily production pipeline](./assets/daily_production_pipeline.png)
 
 Every run lands in three shared tables (`rls_membership_snapshot`, `rls_change_log`, `rls_run_summary`), queryable together regardless of which model wrote them.
 
