@@ -1,4 +1,4 @@
-# Semantic Link — Static RLS Role Manager
+# Semantic Link — Static RLS Management
 
 **Fabric Semantic Link Developer Experience Challenge 2026**
 **Author:** eguigurene
