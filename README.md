@@ -101,8 +101,8 @@ README.md
 LICENSE
 RLS_Management_Functions.ipynb    ← core library
 examples/
-├── RLS_Sales.ipynb
-└── RLS_SalesCloud.ipynb
+├── RLS_Example1.ipynb
+└── RLS_Example2.ipynb
 setup notebooks/
 ├── Connections_template.md
 └── Email_notifications_template.md
