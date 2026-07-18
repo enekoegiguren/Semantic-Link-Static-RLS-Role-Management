@@ -6,7 +6,7 @@ Cloud, and every difference between the two lives entirely in which keys get
 used and what the dataframe looks like when they're evaluated.
 
 A config is a Python dict of dicts. Each top-level key is an arbitrary name
-you choose; each value is a settings object that tells `create_or_replace_roles_v3`
+you choose; each value is a settings object that tells `create_or_replace_roles`
 how to turn rows of your RLS source table into semantic-model roles.
 
 **The config never contains DAX.** Nothing in it is a filter string written

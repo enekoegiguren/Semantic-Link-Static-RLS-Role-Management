@@ -64,7 +64,7 @@ Skip this step entirely if your config has no `concatenated_from` entries.
 ## 6. Create the roles
 
 ```python
-create_or_replace_roles_v3(config, dataset, workspace, global_filters=[], rls=df)
+create_or_replace_roles(config, dataset, workspace, global_filters=[], rls=df)
 ```
 
 Safe to re-run — creates new roles, refreshes the DAX filter on existing ones.

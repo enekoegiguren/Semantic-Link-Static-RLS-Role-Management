@@ -90,7 +90,7 @@ config = {
 }
 ```
 
-Seven entries, seven distinct mechanisms, one function (`create_or_replace_roles_v3`)
+Seven entries, seven distinct mechanisms, one function (`create_or_replace_roles`)
 reading all of them the same way.
 
 ## The source data — five users, five different situations

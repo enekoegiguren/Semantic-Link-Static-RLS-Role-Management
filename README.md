@@ -72,7 +72,7 @@ Every run lands in three shared tables (`rls_membership_snapshot`, `rls_change_l
 # Only if config uses concatenated_from
 df, config = preprocess_concatenated_roles(df, config)
 
-create_or_replace_roles_v3(config, dataset, workspace, global_filters, rls=df)
+create_or_replace_roles(config, dataset, workspace, global_filters, rls=df)
 drop_unused_roles(config, dataset, workspace, rls=df)
 
 result, summary = run_with_audit(
@@ -87,7 +87,7 @@ result, summary = run_with_audit(
 | Function | Purpose |
 |---|---|
 | `preprocess_concatenated_roles()` | Builds synthetic columns for `concatenated_from` |
-| `create_or_replace_roles_v3()` | Creates/updates roles + DAX — refreshes filters even on existing roles |
+| `create_or_replace_roles()` | Creates/updates roles + DAX — refreshes filters even on existing roles |
 | `update_members_delta()` | Syncs only the membership delta, batched with automatic failure isolation |
 | `drop_unused_roles()` | Removes roles no longer backed by data |
 | `run_with_audit()` | Wraps any sync with snapshots, change log, summary, and alerts |
