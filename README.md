@@ -1,4 +1,4 @@
-# Semantic Link — Static RLS Management
+# Semantic Link — Static RLS Role Manager
 
 **Fabric Semantic Link Developer Experience Challenge 2026**
 **Author:** eguigurene
@@ -31,14 +31,14 @@ Two modifiers: **`is_numeric: True`** (compares unquoted, needed for Integer col
 
 None of these know about each other. **Power BI unions all of a user's roles per table** — that's where the real flexibility comes from. Extending the model usually means adding one more role, not editing existing config. See [`docs/CONFIGURATION_REFERENCE.md`](./docs/CONFIGURATION_REFERENCE.md) for the full breakdown, and [`docs/CONFIG_TO_ACCESS_EXAMPLE.md`](./docs/CONFIG_TO_ACCESS_EXAMPLE.md) for a worked example tracing config → roles → real user access.
 
-![One engine, two access models](./assets/rls_architecture_diagram.png)
+![One engine, four role types, one RLS table](./assets/1_headertable.png)
 
 ---
 
 ## Two examples in this repo
 
-- **`examples/RLS_Sales.ipynb`** — flat model, every dimension restricts independently.
-- **`examples/RLS_SalesCloud.ipynb`** — access conditioned on record type; required dataframe prep (a precomputed flag + row explosion) before the same config primitives could express it.
+- **`examples/RLS_Example1.ipynb`** — flat model, every dimension restricts independently.
+- **`examples/RLS_Example2.ipynb`** — access conditioned on record type; required dataframe prep (a precomputed flag + row explosion) before the same config primitives could express it.
 
 Same library, same functions, no code changes between them — only what the dataframe looked like by the time the config read it.
 
@@ -52,12 +52,14 @@ This runs as a scheduled pipeline: sync Active Directory → refresh RLS source 
 
 Every run lands in three shared tables (`rls_membership_snapshot`, `rls_change_log`, `rls_run_summary`), queryable together regardless of which model wrote them.
 
+![Assign members — automated, delta-based](./assets/6_assignmembers.png)
+
 ---
 
 ## Prerequisites
 
 - Fabric workspace with a Lakehouse, Power BI semantic model published to it, XMLA Read/Write enabled
-- `semantic-link-labs`
+- `semantic-link-labs` — reliably available via a **custom Fabric Environment** (Data Engineering → Environments → add it as a public library, publish, then attach via the notebook's Environment dropdown). `%pip install` inline works too, but doesn't persist and can silently fail to expose `connect_semantic_model` in `%run`-chained notebooks. Switching environments needs a Spark session restart — re-running cells alone won't pick it up.
 - An RLS source table with at minimum `Username` (UPN) + one column per secured dimension
 
 `RLS_Management_Functions.ipynb` is self-contained — it imports everything it needs. The two example notebooks each `%run` a `Connections` notebook (Lakehouse paths) and, optionally, an `Email notifications` notebook (only if using `alert_to=`). Neither is included, since they'd contain real workspace names and credentials — templates with the exact contract are in [`setup notebooks/`](./setup%20notebooks).

@@ -9,24 +9,13 @@ A config is a Python dict of dicts. Each top-level key is an arbitrary name
 you choose; each value is a settings object that tells `create_or_replace_roles_v3`
 how to turn rows of your RLS source table into semantic-model roles.
 
-## The anatomy of one entry
-
-![JSON to DAX](./assets/rls_json_to_dax.png)
-
-The important thing this diagram shows: **the config doesn't contain DAX.**
-Nothing in the JSON is a filter string you wrote by hand — every filter is
-*generated* from a small number of structural keys. That's what makes the
-same engine reusable: you're never writing DAX, you're describing shape, and
-the engine writes the DAX for you, consistently, every time.
-
-## From one entry to many roles
-
-![One config, many roles](./assets/rls_role_explosion.png)
-
-Neither entry above declares its roles anywhere — the role count comes
-entirely from what's actually in the source data on a given run. Five
-countries in the data today means five roles; a sixth tomorrow means a
-sixth role next run, with no config change required.
+**The config never contains DAX.** Nothing in it is a filter string written
+by hand — every filter is *generated* from a small number of structural
+keys. Neither a config entry nor the RLS table declares its roles anywhere;
+the role count comes entirely from what's actually in the source data on a
+given run. Five countries in the data today means five roles; a sixth
+tomorrow means a sixth role next run, with no config change required. Each
+pattern below shows exactly how.
 
 ## Standard roles — one role per unique value
 
@@ -38,6 +27,8 @@ sixth role next run, with no config change required.
     "source_column": "CountryCode"
 }
 ```
+
+![Simple value roles — one role per unique value](../assets/2_simplevalueroles.png)
 
 | Key | What it controls |
 |---|---|
@@ -80,6 +71,8 @@ because the filter is resolved via role membership, not evaluated per row.
 |---|---|
 | `concatenated_from` | A dict of named sources, each with its own `table` + `column` |
 | `is_numeric` (per source) | Whether the value is compared unquoted. Required whenever the target column is Integer/Whole Number in the model — quoting a number produces a DAX type-comparison error |
+
+![Concatenated roles — combining both columns' values](../assets/3_concatenatedroles.png)
 
 Every source in `concatenated_from` is required — a role only gets created
 for combinations where **all** sources have a non-blank value in the same
@@ -173,6 +166,8 @@ One role, no DAX filter on any table. Membership: every user whose
 role, its members see everything on every table it isn't itself filtered on
 — by design, it's meant to override everything else for the people who have it.
 
+![Full access — one role, no DAX filter at all](../assets/4_fullaccess.png)
+
 ## `special: "consolidated"` — opt-in, flag plus blank-check
 
 ```python
@@ -221,6 +216,8 @@ user has, with blanks handled deliberately — and re-running a generic
 blank-check on top of it would only risk contradicting a calculation that
 was already right.
 
+![Flag driven — why, and the dataframe prep that computes it](../assets/5_flagdriven.png)
+
 A separate, distinct `consolidated_default` type also exists for the
 opposite shape of problem — "grant to everyone except members of another
 named role" — using `exclude_special_keys` to reference another config
@@ -235,8 +232,6 @@ from a concatenated role, one from a consolidated role — and Power BI unions
 all of them per table. The final access pattern is never written down
 anywhere in the config; it's an emergent property of *which* roles a given
 user's data happens to put them in.
-
-![OR composition](./assets/rls_or_composition.png)
 
 Practically, this means extending the security model almost never means
 editing an existing config entry — it means adding one more entry, one more
