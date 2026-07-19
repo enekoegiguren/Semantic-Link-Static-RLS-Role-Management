@@ -88,6 +88,12 @@ result, summary = run_with_audit(
 Never call `update_members_delta(...)` directly in a scheduled run — only
 `run_with_audit()` writes the snapshot, change log, and run summary.
 
+**What a real run looks like** — this is actual output from a production sync (45 config entries, 742 → 750 memberships), not a mockup:
+
+![Real execution log — snapshot, delta, batched add/remove, final summary](../assets/daily_execution_example.png)
+
+Notice the shape of it: a snapshot before, the exact delta computed (10 to add, 2 to remove — not a full rebuild of 750), each change logged individually, then a snapshot after and a summary row. That's the audit trail described above, as it actually prints.
+
 ## 8. Clean up unused roles
 
 ```python

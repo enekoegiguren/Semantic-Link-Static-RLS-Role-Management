@@ -50,7 +50,8 @@ This runs as a scheduled pipeline: sync Active Directory → refresh RLS source 
 
 ![Daily production pipeline](./assets/daily_production_pipeline.png)
 
-Every run lands in three shared tables (`rls_membership_snapshot`, `rls_change_log`, `rls_run_summary`), queryable together regardless of which model wrote them.
+Every run lands in three shared tables (`rls_membership_snapshot`, `rls_change_log`, `rls_run_summary`), queryable together regardless of which model wrote them.  See [`docs/IMPLEMENTATION_GUIDE.md`](./docs/IMPLEMENTATION_GUIDE.md#7-sync-membership-through-the-audit-wrapper) for a real execution log.
+
 
 ![Assign members — automated, delta-based](./assets/6_assignmembers.png)
 
